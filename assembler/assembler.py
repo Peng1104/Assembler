@@ -5,81 +5,93 @@ Module containing the Assembler class.
 from assembler.functions import read_file, retrive_constants, retrive_labels, \
     handle_empty_line, retrive_comment, retrive_instrution_blocks
 
+
 class Assembler:
     """
     Class to assemble assembly code into binary instructions.
     """
 
-    def __init__(self, mne_map : dict[str, int], opcode_length: int = 4, imediate_length: int = 9):
+    def __init__(
+        self,
+        mne_map: dict[str, int],
+        register_map: dict[str, int],
+        opcode_length: int = 4,
+        register_length: int = 3,
+        imediate_length: int = 9
+    ):
         """
         Initialize the Assembler class.
 
         Parameters
-        ----------
-        mne_map : dict[str, int]
-            The mapping of mnemonics to their decimal values.
-        opcode_length : int, optional
-            The length of the opcode in bits (default is 4).
-        imediate_length : int, optional
-            The length of the immediate value in bits (default is 9).
+            mne_map : dict[str, int]
+                The mapping of mnemonics to their decimal values.
+            opcode_length : int, optional
+                The length of the opcode in bits (default is 4).
+            imediate_length : int, optional
+                The length of the immediate value in bits (default is 9).
         """
 
         self.mne_map = mne_map
+        self.regester_map = register_map
         self.__opcode_length = opcode_length
+        self.__register_length = register_length
         self.__imediate_length = imediate_length
 
-    def build(self, asm_file : str) -> list[str]:
+    def build(self, asm_file: str) -> list[str]:
         """
         Build the binary instructions from the assembly file.
 
         Parameters
-        ----------
-        asm_file : str
-            The path to the assembly file.
+            asm_file : str
+                The path to the assembly file.
 
         Returns
-        -------
-        list[str]
-            The content of the MIF file, including the header and instructions.
+            list[str]
+                The content of the MIF file, including the header and instructions.
         """
 
         # Retrive the assembly file lines
         lines = read_file(asm_file)
 
         # Get the constants and labels
-        constants = retrive_constants(lines)
+        using_registers, constants = retrive_constants(lines)
         max_memory_address, labels = retrive_labels(lines)
 
         # Get the MIF file header
-        content = self.__get_mif_configurations(max_memory_address, constants, labels)
+        content: list[str] = self.__get_mif_configurations(
+            using_registers, max_memory_address, constants, labels)
 
         labels.update(constants)
 
         # Encode the ASM Instructions to binary
-        content.extend(self.__encode(lines, labels, len(str(max_memory_address))))
+        content.extend(self.__encode(
+            lines, labels, len(str(max_memory_address))))
 
         # END tag of the MIF file
         content.append("END;")
 
         return content
 
-    def __encode(self, lines: list[str], labels: dict[str, int], address_width: int) -> list[str]:
+    def __encode(
+        self,
+        lines: list[str],
+        labels: dict[str, int],
+        address_width: int
+    ) -> list[str]:
         """
         Encode the assembly instructions into binary format.
 
         Parameters
-        ----------
-        lines : list[str]
-            The lines of assembly code.
-        labels : dict[str, int]
-            The labels defined in the assembly code.
-        address_width : int
-            The width of the memory address.
+            lines : list[str]
+                The lines of assembly code.
+            labels : dict[str, int]
+                The labels defined in the assembly code.
+            address_width : int
+                The width of the memory address.
 
         Returns
-        -------
-        list[str]
-            The binary instructions.
+            list[str]
+                The binary instructions.
         """
 
         memory_address = 0
@@ -95,34 +107,43 @@ class Assembler:
                 handle_empty_line(memory_address, instructions, comment)
                 continue
 
-            mne, imediate = retrive_instrution_blocks(line)
+            mne, register, imediate = retrive_instrution_blocks(line)
 
-            mne = self.__mne_to_binary(mne)
-            imediate = self.__imediate(imediate, labels)
+            if register:
+                binary_instruction = self.__mne_to_binary(mne) + \
+                    self.__register_to_binary(register) + \
+                    self.__imediate_to_binary(imediate, labels)
+
+            else:
+                binary_instruction = self.__mne_to_binary(mne) + \
+                    self.__imediate_to_binary(imediate, labels)
 
             address_str = f"{memory_address}".ljust(address_width)
 
             if comment:
-                instructions.append(f"\t{address_str} : {mne}{imediate}; -- {line} # {comment}")
+                instructions.append(
+                    f"\t{address_str} : {binary_instruction}; -- {line} # {comment}")
 
             else:
-                instructions.append(f"\t{address_str} : {mne}{imediate}; -- {line}")
+                instructions.append(
+                    f"\t{address_str} : {binary_instruction}; -- {line}")
 
             memory_address += 1
 
         return instructions
 
     def __get_mif_configurations(
-            self,
-            max_memory_address : int,
-            constants : dict[str, int],
-            labels : dict[str, int]
-        ) -> list[str]:
-
+        self,
+        using_registers: bool,
+        max_memory_address: int,
+        constants: dict[str, int],
+        labels: dict[str, int]
+    ) -> list[str]:
         """
         Get the MIF configurations for the memory file.
 
         Parameters:
+            using_registers (bool): Whether to the registers are in use or not.
             max_memory_address (int): The maximum memory address, used to calculate the 
                                       depth of the memory.
             constants (dict[str, int]): The constants defined in the assembly file.
@@ -132,14 +153,20 @@ class Assembler:
             list[str]: The MIF configuration instructions.
         """
 
+        width = self.__opcode_length + self.__imediate_length
+
+        if using_registers:
+            width += self.__register_length
+
         instructions = []
 
         instructions.append("-- -------------------------------------")
         instructions.append("--               MIF File")
         instructions.append("-- -------------------------------------")
         instructions.append("")
-        instructions.append(f"WIDTH={self.__opcode_length + self.__imediate_length};")
-        instructions.append(f"DEPTH={2 ** (max_memory_address + 1).bit_length()};")
+        instructions.append(f"WIDTH={width};")
+        instructions.append(
+            f"DEPTH={2 ** (max_memory_address + 1).bit_length()};")
         instructions.append("")
         instructions.append("ADDRESS_RADIX=DEC;")
         instructions.append("DATA_RADIX=BIN;")
@@ -176,13 +203,33 @@ class Assembler:
 
         return instructions
 
-    def __imediate(self, imediate: str, labels : dict[str, int]) -> str:
+    def __register_to_binary(self, register: str) -> str:
+        """
+        Get the register value in binary format.
+
+        Parameters:
+            register (str): The register name.
+
+        Returns:
+            str: The register value in binary format, padded with zeros.
+        """
+
+        if register == "0":
+            return "0" * self.__register_length
+
+        if register in self.regester_map:
+            return bin(self.regester_map[register])[2:].zfill(self.__register_length)
+
+        print(f"ERROR: Unknown register: {register}")
+        return "0" * self.__register_length
+
+    def __imediate_to_binary(self, imediate: str, labels: dict[str, int]) -> str:
         """
         Get the imediate value in binary format.
 
         Parameters:
             imediate (str): The immediate value or label.
-            n_bits (int): The number of bits for the binary representation.
+            labels (dict[str, int]): The labels defined in the assembly file.
 
         Returns:
             str: The immediate value in binary format, padded with zeros.
@@ -204,14 +251,11 @@ class Assembler:
         """
         Return the binary representation of a mnemonic.
 
-        Parameters
-        ----------
-        mne : str
-            The mnemonic to convert.
-        Returns
-        -------
-        str
-            The binary representation of the mnemonic.
+        Parameters:
+            mne (str): The mnemonic.
+
+        Returns:
+            str: The binary representation of the mnemonic.
         """
 
         if mne in self.mne_map:

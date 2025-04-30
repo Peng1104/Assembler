@@ -2,19 +2,18 @@
 Module containing the auxiliary functions for the assembler.
 """
 
+
 def read_file(path: str) -> list[str]:
     """
     Read a text file and return its content as a list of lines.
 
     Parameters
-    ----------
-    path : str
-        The path to the file to read.
+        path : str
+            The path to the file to read.
 
     Returns
-    -------
-    list[str]
-        The content of the file as a list of lines.
+        list[str]
+            The content of the file as a list of lines.
     """
 
     try:
@@ -29,16 +28,16 @@ def read_file(path: str) -> list[str]:
         print(f"FATAL: Could not read file {path}: {e}")
         return []
 
+
 def write_to_file(path: str, content: list[str]) -> None:
     """
     Write the given content to a file.
 
     Parameters
-    ----------
-    path : str
-        The path to the file to write.
-    content : list[str]
-        The content to write to the file.
+        path : str
+            The path to the file to write.
+        content : list[str]
+            The content to write to the file.
     """
 
     try:
@@ -52,21 +51,23 @@ def write_to_file(path: str, content: list[str]) -> None:
     except IOError as e:
         print(f"FATAL Could not write to file {path}: {e}")
 
-def retrive_constants(lines : list[str]) -> dict[str, int]:
+
+def retrive_constants(lines: list[str]) -> tuple[bool, dict[str, int]]:
     """
     Retrive the constants from the assembly file.
 
     Parameters
-    ----------
-    lines : list[str]
-        The lines of the assembly file.
+        lines : list[str]
+            The lines of the assembly file.
 
     Returns
-    -------
-    dict[str, int]
-        The constants defined in the assembly file.
+        bool:
+            True if registers are used, False otherwise.
+        dict[str, int]:
+            The constants defined in the assembly file.
     """
 
+    using_registers = False
     constants = {}
 
     for index, line in enumerate(lines, start=1):
@@ -84,21 +85,25 @@ def retrive_constants(lines : list[str]) -> dict[str, int]:
                 print(
                     f"ERROR: Line {index}: Invalid constant definition: {line}")
 
-    return constants
+        elif "," in value:
+            using_registers = True
 
-def retrive_labels(lines : list[str]) -> tuple[int, dict[str, int]]:
+    return using_registers, constants
+
+
+def retrive_labels(lines: list[str]) -> tuple[int, dict[str, int]]:
     """
     Retrive the labels from the assembly file.
 
     Parameters
-    ----------
-    lines : list[str]
-        The lines of the assembly file.
+        lines : list[str]
+            The lines of the assembly file.
 
     Returns
-    -------
-    tuple[int, dict[str, int]]
-        The maximum memory address and the labels defined in the assembly file.
+        int :
+            The memory address of the first instruction.
+        dict[str, int]:
+            The labels defined in the assembly file.
     """
 
     memory_address = 0
@@ -122,23 +127,22 @@ def retrive_labels(lines : list[str]) -> tuple[int, dict[str, int]]:
 
     return memory_address, labels
 
-def handle_empty_line(
-        memory_address: int,
-        instructions: list[str],
-        comment: str
-    ) -> None:
 
+def handle_empty_line(
+    memory_address: int,
+    instructions: list[str],
+    comment: str
+) -> None:
     """
     Handle empty lines in the assembly code.
 
     Parameters
-    ----------
-    memory_address : int
-        The current memory address.
-    instructions : list[str]
-        The list of instructions.
-    comment : str
-        The comment associated with the empty line.
+        memory_address : int
+            The current memory address.
+        instructions : list[str]
+            The list of instructions.
+        comment : str
+            The comment associated with the empty line.
     """
 
     if memory_address < 1 and len(instructions) > 0:
@@ -147,19 +151,20 @@ def handle_empty_line(
     if comment:
         instructions.append("\t-- " + comment)
 
+
 def retrive_comment(line: str) -> tuple[str, str]:
     """
     Retrive the comment from a line of assembly code.
 
     Parameters
-    ----------
-    line : str
-        The line to process.
-    
+        line : str
+            The line to process.
+
     Returns
-    -------
-    tuple[str, str]
-        The instruction and the comment.
+        str:
+            The line without the comment.
+        str:
+            The comment itself.
     """
 
     if '#' in line:
@@ -169,22 +174,35 @@ def retrive_comment(line: str) -> tuple[str, str]:
 
     return line.strip(), ""
 
-def retrive_instrution_blocks(line: str) -> tuple[str, str]:
+
+def retrive_instrution_blocks(line: str) -> tuple[str, str | None, str]:
     """
     Retrive the instruction blocks from a line of assembly code.
 
     Parameters
-    ----------
-    line : str
-        The instruction line.
+        line : str
+            The instruction line to process.
 
     Returns
-    -------
-    tuple[str, str]
-        The mnemonic and immediate value.
+        str :
+            The mnemonic of the instruction.
+        str | None:
+            The register being used, if any.
+        str:
+            The address or immediate value of the instruction.
     """
 
-    if "@" in line:
+    register = None
+    imediate = "0"
+
+    if "," in line:
+        splits = line.split(",")
+
+        mne = splits[0].strip()
+        register = splits[1].strip() if len(splits) > 1 else "0"
+        imediate = splits[2].strip() if len(splits) > 2 else "0"
+
+    elif "@" in line:
         splits = line.split("@")
 
         mne = splits[0].strip()
@@ -198,6 +216,5 @@ def retrive_instrution_blocks(line: str) -> tuple[str, str]:
 
     else:
         mne = line.strip()
-        imediate = "0"
 
-    return mne, imediate
+    return mne, register, imediate

@@ -4,7 +4,7 @@ Main module for the assembler package.
 
 import sys
 from assembler.assembler import Assembler
-from assembler.enums import Mnemonicos
+from assembler.enums import Mnemonicos, Registers
 from assembler.functions import write_to_file
 
 if __name__ == "__main__":
@@ -20,6 +20,7 @@ if __name__ == "__main__":
 
         MIF_FILE = sys.argv[2]
 
-    assembler = Assembler({mne.name: mne.value for mne in Mnemonicos})
+    assembler = Assembler({mne.name: mne.value for mne in Mnemonicos}, {
+                          register.name: register.value for register in Registers})
 
     write_to_file(MIF_FILE, assembler.build(sys.argv[1]))
