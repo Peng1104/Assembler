@@ -52,7 +52,7 @@ def write_to_file(path: str, content: list[str]) -> None:
         print(f"FATAL Could not write to file {path}: {e}")
 
 
-def retrive_constants(lines: list[str]) -> tuple[bool, dict[str, int]]:
+def retrive_constants(lines: list[str]) -> dict[str, int]:
     """
     Retrive the constants from the assembly file.
 
@@ -61,13 +61,10 @@ def retrive_constants(lines: list[str]) -> tuple[bool, dict[str, int]]:
             The lines of the assembly file.
 
     Returns
-        bool:
-            True if registers are used, False otherwise.
         dict[str, int]:
             The constants defined in the assembly file.
     """
 
-    using_registers = False
     constants = {}
 
     for index, line in enumerate(lines, start=1):
@@ -85,10 +82,7 @@ def retrive_constants(lines: list[str]) -> tuple[bool, dict[str, int]]:
                 print(
                     f"ERROR: Line {index}: Invalid constant definition: {line}")
 
-        elif "," in value:
-            using_registers = True
-
-    return using_registers, constants
+    return constants
 
 
 def retrive_labels(lines: list[str]) -> tuple[int, dict[str, int]]:
@@ -196,11 +190,15 @@ def retrive_instrution_blocks(line: str) -> tuple[str, str | None, str]:
     imediate = "0"
 
     if "," in line:
-        splits = line.split(",")
+        mne, blocks = line.split(maxsplit=1)
 
-        mne = splits[0].strip()
-        register = splits[1].strip() if len(splits) > 1 else "0"
-        imediate = splits[2].strip() if len(splits) > 2 else "0"
+        mne = mne.strip()
+
+        if len(blocks) > 0:
+            splits = blocks.split(",")
+
+            register = splits[0].strip()
+            imediate = splits[1].strip()
 
     elif "@" in line:
         splits = line.split("@")

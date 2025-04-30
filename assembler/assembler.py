@@ -14,7 +14,7 @@ class Assembler:  # pylint: disable=too-few-public-methods
     def __init__(
         self,
         mne_map: dict[str, int],
-        register_map: dict[str, int],
+        register_map: dict[str, int] = None,
         opcode_length: int = 4,
         register_length: int = 3,
         imediate_length: int = 9
@@ -25,14 +25,18 @@ class Assembler:  # pylint: disable=too-few-public-methods
         Parameters
             mne_map : dict[str, int]
                 The mapping of mnemonics to their decimal values.
+            register_map : dict[str, int], optional
+                The mapping of registers to their decimal values (default is empty).
             opcode_length : int, optional
                 The length of the opcode in bits (default is 4).
+            register_length : int, optional
+                The length of the register in bits (default is 3).
             imediate_length : int, optional
                 The length of the immediate value in bits (default is 9).
         """
 
         self.mne_map = mne_map
-        self.regester_map = register_map
+        self.regester_map = register_map or {}
         self.__opcode_length = opcode_length
         self.__register_length = register_length
         self.__imediate_length = imediate_length
@@ -54,12 +58,12 @@ class Assembler:  # pylint: disable=too-few-public-methods
         lines = read_file(asm_file)
 
         # Get the constants and labels
-        using_registers, constants = retrive_constants(lines)
+        constants = retrive_constants(lines)
         max_memory_address, labels = retrive_labels(lines)
 
         # Get the MIF file header
         content: list[str] = self.__get_mif_configurations(
-            using_registers, max_memory_address, constants, labels)
+            max_memory_address, constants, labels)
 
         labels.update(constants)
 
@@ -114,6 +118,11 @@ class Assembler:  # pylint: disable=too-few-public-methods
                     self.__register_to_binary(register) + \
                     self.__imediate_to_binary(imediate, labels)
 
+            elif len(self.regester_map) > 0:
+                binary_instruction = self.__mne_to_binary(mne) + \
+                    "0" * self.__register_length + \
+                    self.__imediate_to_binary(imediate, labels)
+
             else:
                 binary_instruction = self.__mne_to_binary(mne) + \
                     self.__imediate_to_binary(imediate, labels)
@@ -134,7 +143,6 @@ class Assembler:  # pylint: disable=too-few-public-methods
 
     def __get_mif_configurations(
         self,
-        using_registers: bool,
         max_memory_address: int,
         constants: dict[str, int],
         labels: dict[str, int]
@@ -143,7 +151,6 @@ class Assembler:  # pylint: disable=too-few-public-methods
         Get the MIF configurations for the memory file.
 
         Parameters:
-            using_registers (bool): Whether to the registers are in use or not.
             max_memory_address (int): The maximum memory address, used to calculate the 
                                       depth of the memory.
             constants (dict[str, int]): The constants defined in the assembly file.
@@ -155,7 +162,7 @@ class Assembler:  # pylint: disable=too-few-public-methods
 
         width = self.__opcode_length + self.__imediate_length
 
-        if using_registers:
+        if len(self.regester_map) > 0:
             width += self.__register_length
 
         instructions = []
@@ -213,9 +220,6 @@ class Assembler:  # pylint: disable=too-few-public-methods
         Returns:
             str: The register value in binary format, padded with zeros.
         """
-
-        if register == "0":
-            return "0" * self.__register_length
 
         if register in self.regester_map:
             value = self.regester_map[register]
