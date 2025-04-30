@@ -6,7 +6,7 @@ from assembler.functions import read_file, retrive_constants, retrive_labels, \
     handle_empty_line, retrive_comment, retrive_instrution_blocks
 
 
-class Assembler:
+class Assembler:  # pylint: disable=too-few-public-methods
     """
     Class to assemble assembly code into binary instructions.
     """
@@ -18,7 +18,7 @@ class Assembler:
         opcode_length: int = 4,
         register_length: int = 3,
         imediate_length: int = 9
-    ):
+    ):  # pylint: disable=too-many-arguments, too-many-positional-arguments
         """
         Initialize the Assembler class.
 
@@ -218,7 +218,15 @@ class Assembler:
             return "0" * self.__register_length
 
         if register in self.regester_map:
-            return bin(self.regester_map[register])[2:].zfill(self.__register_length)
+            value = self.regester_map[register]
+
+            if value.bit_length() > self.__register_length:
+                print(
+                    f"WARNING: Register '{register}' is too large for the register field.")
+
+                value = value & ((1 << self.__register_length) - 1)
+
+            return bin(value)[2:].zfill(self.__register_length)
 
         print(f"ERROR: Unknown register: {register}")
         return "0" * self.__register_length
@@ -240,10 +248,19 @@ class Assembler:
 
         else:
             try:
-                value = int(imediate)
+                if imediate.startswith("0x"):
+                    value = int(imediate[2:], 16)
+                else:
+                    value = int(imediate)
             except ValueError:
                 print(f"ERROR: Could not convert '{imediate}' to an integer.")
                 return "0" * self.__imediate_length
+
+        if value.bit_length() > self.__imediate_length:
+            print(
+                f"WARNING: Immediate value '{imediate}' is too large for the immediate field.")
+
+            value = value & ((1 << self.__imediate_length) - 1)
 
         return bin(value)[2:].zfill(self.__imediate_length)
 
@@ -259,7 +276,15 @@ class Assembler:
         """
 
         if mne in self.mne_map:
-            return bin(self.mne_map[mne])[2:].zfill(self.__opcode_length)
+            value = self.mne_map[mne]
+
+            if value.bit_length() > self.__opcode_length:
+                print(
+                    f"WARNING: Mnemonic '{mne}' is too large for the opcode field.")
+
+                value = value & ((1 << self.__opcode_length) - 1)
+
+            return bin(value)[2:].zfill(self.__opcode_length)
 
         print(f"ERROR: Unknown instruction: {mne}")
         return "0" * self.__opcode_length
