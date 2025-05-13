@@ -15,8 +15,8 @@ class Assembler:  # pylint: disable=too-few-public-methods
         self,
         mne_map: dict[str, int],
         register_map: dict[str, int] = None,
-        opcode_length: int = 4,
-        register_length: int = 3,
+        opcode_length: int = 5,
+        register_length: int = 2,
         imediate_length: int = 9
     ):  # pylint: disable=too-many-arguments, too-many-positional-arguments
         """
